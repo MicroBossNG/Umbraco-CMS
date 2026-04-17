@@ -170,6 +170,86 @@ export class UmbMyController extends UmbControllerBase {
 #controller = new UmbMyController(this, new UmbContentRepository());
 ```
 
+### Event Listener Cleanup Pattern
+
+**Critical for Memory Leak Prevention**:
+
+When adding event listeners, you must ensure they can be properly removed. Using `.bind(this)` creates a new function reference each time, making cleanup impossible.
+
+**Wrong Pattern - Memory Leak**:
+
+```typescript
+export class UmbMyElement extends LitElement {
+	constructor() {
+		super();
+		// ❌ BAD: Each .bind(this) creates a NEW function reference
+		window.addEventListener('storage', this.#onStorageEvent.bind(this));
+	}
+
+	disconnectedCallback() {
+		// ❌ This creates ANOTHER function reference - doesn't remove the original listener!
+		window.removeEventListener('storage', this.#onStorageEvent.bind(this));
+	}
+
+	#onStorageEvent(evt: StorageEvent) {
+		// Handler logic
+	}
+}
+```
+
+**Correct Pattern - Arrow Function Property**:
+
+```typescript
+export class UmbMyElement extends LitElement {
+	// ✅ GOOD: Arrow function property maintains consistent reference
+	#onStorageEvent = async (evt: StorageEvent) => {
+		// Handler logic
+		if (evt.key === 'myKey') {
+			await this.handleStorageChange();
+		}
+	};
+
+	constructor() {
+		super();
+		// ✅ GOOD: No .bind() needed - arrow function preserves 'this'
+		window.addEventListener('storage', this.#onStorageEvent);
+	}
+
+	disconnectedCallback() {
+		// ✅ GOOD: Removes the SAME function reference
+		window.removeEventListener('storage', this.#onStorageEvent);
+	}
+}
+```
+
+**Key Points**:
+- Use arrow function properties for event handlers
+- Arrow functions automatically bind `this` without creating new references
+- Each `addEventListener` and `removeEventListener` must use the SAME function reference
+- Always remove event listeners in `disconnectedCallback()` for custom elements
+- This pattern prevents memory leaks by ensuring proper cleanup
+
+**Common Event Listener Scenarios**:
+
+```typescript
+// Document/window events
+document.addEventListener('dragenter', this.#onDragEnter);
+window.addEventListener('storage', this.#onStorage);
+
+// Programmatically created elements
+this.#element = new MyElement();
+this.#element.addEventListener('action-executed', this.#onAction);
+
+// Always clean up in disconnectedCallback
+disconnectedCallback() {
+	document.removeEventListener('dragenter', this.#onDragEnter);
+	window.removeEventListener('storage', this.#onStorage);
+	if (this.#element) {
+		this.#element.removeEventListener('action-executed', this.#onAction);
+	}
+}
+```
+
 ### Avoid Code Smells
 
 **Magic Numbers/Strings**:
@@ -381,6 +461,23 @@ export class UmbDocumentActionButton extends LitElement {
 - Don't comment out code, delete it (Git history preserves it)
 - Remove unused imports, functions, variables
 - Clean up console.logs before committing
+
+### Feature Parity with Core Equivalents
+
+When implementing a new component that mirrors an existing core or sibling implementation (e.g. a new collection action alongside document/media/member equivalents), do a side-by-side comparison against the core version before considering it done.
+
+**Checklist**:
+
+1. **Full API surface**: Read the reference implementation's controller/API usage line by line. Every method call, callback, and property access on controllers in the reference must have a counterpart in the new implementation — don't cherry-pick only the obvious ones.
+2. **Error handling**: Match the core's error handling pattern (e.g. `.catch(() => {})` on `execute()` calls) to prevent unhandled promise rejections.
+3. **Type hierarchy**: Before defining new interfaces, search for existing base types (e.g. `UmbNamedEntityModel` vs `UmbEntityModel`) that already declare the fields you need. Use the most specific base.
+4. **UI consistency**: Check CSS from sibling implementations (e.g. `max-height` on scroll containers, icon fallbacks like `?? 'icon-document'`).
+5. **Context-appropriate strings**: Don't reuse localization keys from another domain (e.g. `create_noDocumentTypes` in an elements context). Either create a new key or use only the inline fallback text.
+
+**Core components to compare against** (common patterns):
+- Collection create actions: `src/packages/core/collection/action/create/collection-create-action.element.ts`
+- Entity create option modals: `src/packages/core/entity-action/common/create/modal/entity-create-option-action-list-modal.element.ts`
+- Document/media/member equivalents in their respective `src/packages/` directories
 
 ### Patterns to Avoid
 

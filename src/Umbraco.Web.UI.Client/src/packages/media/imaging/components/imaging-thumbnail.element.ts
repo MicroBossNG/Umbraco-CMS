@@ -38,6 +38,13 @@ export class UmbImagingThumbnailElement extends UmbLitElement {
 	mode: UmbImagingCropMode = UmbImagingCropMode.MIN;
 
 	/**
+	 * The output format of the thumbnail.
+	 * @description The format to convert the image to. If not specified, the backend automatically determines the best format based on the source file type.
+	 */
+	@property({ type: String })
+	format?: string;
+
+	/**
 	 * The alt text for the thumbnail.
 	 */
 	@property({ type: String })
@@ -126,7 +133,7 @@ export class UmbImagingThumbnailElement extends UmbLitElement {
 	#renderThumbnail() {
 		return when(
 			this._thumbnailUrl,
-			(url) => html`<img id="figure" src=${url} alt=${this.alt} loading=${this.loading} draggable="false" />`,
+			(url) => html`<img id="figure" src=${url} alt=${this.alt} loading=${this.loading} decoding="async" draggable="false" />`,
 			() => html`<umb-icon id="icon" name=${this.icon}></umb-icon>`,
 		);
 	}
@@ -139,6 +146,7 @@ export class UmbImagingThumbnailElement extends UmbLitElement {
 			height: this.height,
 			width: this.width,
 			mode: this.mode,
+			format: this.format,
 		});
 
 		this._thumbnailUrl = data?.[0]?.url ?? '';
@@ -168,7 +176,8 @@ export class UmbImagingThumbnailElement extends UmbLitElement {
 				display: block;
 				width: 100%;
 				height: 100%;
-				object-fit: cover;
+				object-fit: contain;
+				object-position: center;
 
 				background-image: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" fill-opacity=".1"><path d="M50 0h50v50H50zM0 50h50v50H0z"/></svg>');
 				background-size: 10px 10px;
